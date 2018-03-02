@@ -1,48 +1,355 @@
+# ProceduralCity_WebGL
 
-# Project 5: Shape Grammar
+![](images/screen_4.png)
 
-For this assignment you'll be building directly off of the L-system code you
-wrote last week.
+## Important Node
 
-**Goal:** to model an urban environment using a shape grammar.
+Please run this on Windows. There seems to be a glitch in my mac with this code. All screenshots here are on a windows pc.
 
-**Note:** We’re well aware that a nice-looking procedural city is a lot of work for a single week. Focus on designing a nice building grammar. The city layout strategies outlined in class (the extended l-systems) are complex and not expected. We will be satisfied with something reasonably simple, just not a uniform grid!
+My focus on this project was purely on configuration that enables me to draw different buildings with minimal effort. Sadly, couldn't spend much time making it pretty. I have some small stuffs like a distance fog, some textures on windows and roofs but thats pretty much it.
 
-## Symbol Node (5 points)
-Modify your symbol node class to include attributes necessary for rendering, such as
-- Associated geometry instance
-- Position
-- Scale
-- Anything else you may need
+[Demo Link](https://vasumahesh1.github.io/ProceduralCity_WebGL/)g
 
-## Grammar design (55 points)
-- Design at least five shape grammar rules for producing procedural buildings. Your buildings should vary in geometry and decorative features (beyond just differently-scaled cubes!). At least some of your rules should create child geometry that is in some way dependent on its parent’s state. (20 points)
-    - Eg. A building may be subdivided along the x, y, or z axis into two smaller buildings
-    - Some of your rules must be designed to use some property about its location. (10 points)
-    - Your grammar should have some element of variation so your buildings are non-deterministic.  Eg. your buildings sometimes subdivide along the x axis, and sometimes the y. (10 points)   
-- Write a renderer that will interpret the results of your shape grammar parser and adds the appropriate geometry to your scene for each symbol in your set. (10 points)
+## Grammar Design
 
-## Create a city (30 points)
-- Add a ground plane or some other base terrain to your scene (0 points, come on now)
-- Using any strategy you’d like, procedurally generate features that demarcate your city into different areas in an interesting and plausible way (Just a uniform grid is neither interesting nor plausible). (20 points)
-    - Suggestions: roads, rivers, lakes, parks, high-population density
-    - Note, these features don’t have to be directly visible, like high-population density, but they should somehow be visible in the appearance or arrangement of your buildings. Eg. High population density is more likely to generate taller buildings
-- Generate buildings throughout your city, using information about your city’s features. Color your buildings with a method that uses some aspect of its state. Eg. Color buildings by height, by population density, by number of rules used to generate it. (5 points)
-- Document your grammar rules and general approach in the readme. (5 points)
-- ???
-- Profit.
+### Building Blueprints
 
-## Make it interesting (10)
-Experiment! Make your city a work of art.
+Inorder to have a balance between lsystem shape grammar and some noise, I decided that the turtle will be responsible for drawing how a Lot will look like. Instead of relying purely on shapes like Cubes, The turtle is capable of drawing `LotSides` which are just lines. This enables me to programmatically also generate lines like a circle, hexagon etc. And not just rely on objs.
 
-## Warnings:
-If you're not careful with how many draw calls you make in a single `tick()`,
-you can very easily blow up your CPU with this assignment. As with the L-system,
-try to group geometry into one VBO so the run-time of your program outside of
-the time spent generating the city is fast.
+So the Grammar starts when a Property is allocated in the region based on Noise. Each Property gets a JSON based Configuration that details how this property will look like. An example would be selecting the Windows for the Building.
 
-## Suggestions for the overachievers:
-Go for a very high level of decorative detail!
-Place buildings with a strategy such that buildings have doors and windows that are always accessible.
-Generate buildings with coherent interiors
-If dividing your city into lots, generate odd-shaped lots and create building meshes that match their shape .i.e. rather than working with cubes, extrude upwards from the building footprints you find to generate a starting mesh to subdivide rather than starting with platonic geometry.
+You can think of this as a Theme for the Building which will be created.
+
+Here is a Full Building Blueprint
+```json
+{
+  "name": "Building Blueprint 1",
+  "selectionWeight": 100,
+  "windows": {
+    "rng": {
+      "seed": 17,
+      "type": "WeightedRNG",
+      "val": {
+        "WindowComponent1": 10,
+        "WindowComponent2": 10
+      }
+    }
+  },
+  "walls": [{
+    "rng": {
+      "seed": 123,
+      "type": "WeightedRNG",
+      "val": {
+        "WallComponent1": 10,
+        "WallComponent2": 10,
+        "WallComponent3": 10,
+        "WallComponent4": 10
+      }
+    },
+    "default": true
+  }],
+  "roofs": {
+    "rng": {
+      "seed": 17,
+      "type": "WeightedRNG",
+      "val": {
+        "RoofComponent1": 10,
+        "RoofComponent2": 50
+      }
+    }
+  },
+  "iteration": {
+    "rng": {
+      "seed": 39,
+      "type": "RNG",
+      "min": 2,
+      "max": 4
+    }
+  },
+  "floors": {
+    "rng": {
+      "seed": 3,
+      "type": "RNG",
+      "min": 12,
+      "max": 25
+    },
+    "type": {
+      "rng": {
+        "seed": 123,
+        "type": "WeightedRNG",
+        "val": {
+          "RANDOM_ACROSS_LOTS": 2
+        }
+      }
+    },
+    "height": {
+      "rng": {
+        "seed": 213,
+        "type": "RNG",
+        "min": 3,
+        "max": 6
+      }
+    },
+    "separator": {
+      "rng": {
+        "seed": 432,
+        "type": "WeightedRNG",
+        "val": {
+          "RANDOM_ACROSS_LOTS": 2,
+          "RANDOM_ACROSS_FLOORS": 0,
+          "FIXED": 100
+        }
+      },
+      "placement": {
+        "rng": {
+          "seed": 2134,
+          "type": "WeightedRNG",
+          "val": {
+            "CAN_PLACE": 100,
+            "CANNOT_PLACE": 0
+          }
+        }
+      },
+      "obj": {
+        "rng": {
+          "seed": 124,
+          "type": "WeightedRNG",
+          "val": {
+            "SepComponent1": 10
+          }
+        }
+      }
+    }
+  },
+  "constraints": {
+    "population": 0.6
+  }
+}
+``` 
+
+I have defined some class structures which cover the random "rng" keyword in the json. Before loading the city, This json is read and the blueprints are initialized.
+
+There are a lot of things to change and are mostly readable.
+
+
+### Components
+
+Now the `Components` you see are the base building blocks of my procedural city.
+
+A Component Configuration Looks like:
+
+```json
+{
+  "name": "WallComponent1",
+  "url": "./src/objs/comp_wall.obj",
+  "width": 1,
+  "type": "wall",
+  "baseScale": [1, 3, 1],
+  "uvOffset": [0,0]
+}
+```
+
+I have textures enabled for windows roofs etc. But I havent textured them in photoshop. They just have a matte color for now (except windows & roofs).
+
+### Lots
+
+LSystems have capability to draw lots with different shapes, combine them and from these lots I "pull out" buildings.
+
+Lots can be **FIXED** or **DYNAMIC**.
+
+Fixed Lots look like:
+
+```json
+{
+  "name": "Square",
+  "type": "FIXED",
+  "sides": [{
+    "start": [0, 0],
+    "end": [1, 0]
+  }, {
+    "start": [1, 0],
+    "end": [1, 1]
+  }, {
+    "start": [1, 1],
+    "end": [0, 1]
+  }, {
+    "start": [0, 1],
+    "end": [0, 0]
+  }]
+}
+```
+
+
+Dynamic Lots look like:
+
+```json
+{
+  "name": "Circle",
+  "type": "DYNAMIC",
+  "controller": "PolygonLotConstructor",
+  "options": {
+    "startAngle": 0,
+    "endAngle": 360,
+    "subDivs": 16,
+    "radius": 0.5,
+    "offset": [0.5, 0.5]
+  }
+}
+```
+
+Notice the use of `controller` that invokes a JS Function to get the `LotSides` dynamically for each lot.
+
+Dynamic Lots are, you _guessed it_ dynamically roofed by just a simple triangulation over them.
+
+### Noise cache & Population Noise
+
+I cached some of the noise into const variables that later gets injected by webpack. It helps in saving generation time. I use noise on a lot things, they control almost everything related to construction.
+
+Population based noise to change building heights is also included. I haven't had much time to play with it, Since I was working mostly on building creation.
+
+### Windows
+
+My Building have windows that are separtely modeled. They are used in a very different LSystem like config that varies per building and per side.
+
+It works by generating a string for its Layout. For example a layout can be `*W*W*W*` which means that `LotSide` where these windows are to be placed, will construct three equally spaced Windows.
+
+Another way to extend different window combinations. These are also present in Building Blueprint JSON. Also, If the string exceeds the actual length available then the algorithm tries to best fit the windows that it can stuff in that `LotSide`.
+
+### Building Collision
+
+I have a simple collider check for each `Property` that gets allocated.
+
+### LSystem 2.0
+
+I modded the hell out of my LSystem. It includes some really great features which allow me to check for constraints, rule production based params, function params. Here is a small snippet that will showcase it:
+
+```js
+// {} Indicates Parameter Passing as a CSV (comma separated value) to my Production Rules
+
+this.system.addRule("Q", "bF{1}+Q");
+this.system.addRule("W", "F{1.0}b{0.5}F{1.0}-W");
+
+// F{1} means we move Forward in the Heading Direction of the Turtle by 1 magnitude.
+// b{0.5} means draw a square lot with 0.5 scale.
+// You can see how One can further make this awesome by adding some randomness
+// or some constraints that change these rule definitions on the fly!
+
+// Resuse a Production Rule
+I was tired of making functions for drawing different Lots. So I use:
+this.system.addSymbol('z', drawShape, ['Circle']);
+this.system.addSymbol('x', drawShape, ['TiltedSquare']);
+this.system.addSymbol('c', drawShape, ['Hex']);
+
+
+// Same Function, A new param and for each symbol.
+
+// Use it as:
+function drawShape(shape: string) {
+```
+
+The lots on which the LSystem operates is of Size 2x2 only. They get later scaled in the relative Property size. The rules are also ensured in such a way that the turtle never exceeds the boundary condition.
+
+
+### Grammar Productions
+
+#### Pattern Rules
+
+These rules are dedicated to select a pattern.
+
+```js
+// Pattern Rules
+this.system.addWeightedRule("P", "Q", 100);
+this.system.addWeightedRule("P", "F{0.5}+F{0.5}bW", 100);
+this.system.addWeightedRule("P", "E", 100);
+this.system.addWeightedRule("P", "F{0.5}+F{0.5}bR", 100);
+this.system.addWeightedRule("P", "F{0.5}+F{0.5}bT", 100);
+this.system.addWeightedRule("P", "Y", 100);
+this.system.addWeightedRule("P", "U", 100);
+this.system.addWeightedRule("P", "I", 100);
+this.system.addWeightedRule("P", "F{0.5}+F{0.5}zA", 100);
+this.system.addWeightedRule("P", "D", 100);
+```
+
+#### Growing Rules
+
+These rules are dedicated to grow on the pattern.
+
+```js
+this.system.addRule("Q", "bF{1}+Q");
+this.system.addRule("W", "F{1.0}b{0.5}F{1.0}-W");
+this.system.addRule("E", "[F{0.2}+F{0.2}b{0.75}]F{1.75}+E");
+
+this.system.addRule("R", "F{1.0}^{0.5}b{0.5}F{1.0}-R");
+this.system.addRule("T", "F{1.0}[^{0.5}b{0.5}]F{1.0}-T");
+this.system.addRule("Y", "S{1}oF{-2}+F{-2}x{-1}");
+this.system.addRule("U", "S{1}oF{-2}+F{-2}o{-1}");
+
+this.system.addRule("I", "zF{1}+I");
+this.system.addRule("A", "F{1.0}z{0.5}F{1.0}-A");
+this.system.addRule("D", "[F{0.2}+F{0.2}z{0.75}]F{1.75}+D");
+
+this.system.addRule("G", "cF{1}+G");
+this.system.addRule("H", "F{1.0}c{0.5}F{1.0}-H");
+this.system.addRule("J", "[F{0.2}+F{0.2}c{0.75}]F{1.75}+J");
+
+// Functions pretty much explain what they do.
+this.system.addSymbol('b', drawSquareLot, []);
+this.system.addSymbol('o', drawHalfCircleLot, []);
+this.system.addSymbol('z', drawShape, ['Circle']);
+this.system.addSymbol('x', drawShape, ['TiltedSquare']);
+this.system.addSymbol('c', drawShape, ['Hex']);
+
+this.system.addSymbol('+', rotateCCW90, []);
+this.system.addSymbol('-', rotateCW90, []);
+
+this.system.addSymbol('*', rotateCCWAngle, []);
+this.system.addSymbol('/', rotateCWAngle, []);
+
+this.system.addSymbol('^', moveUp, []);
+this.system.addSymbol('v', moveDown, []);
+
+this.system.addSymbol('F', moveForward, []);
+this.system.addSymbol('V', moveVector, []);
+
+this.system.addSymbol('S', setSameSize, []);
+```
+
+
+### Asset Loader
+
+I made a simple asset loader using AsyncJS and Promises. Not that it is a part of the assignment, but worth mentioning as it simplified my asset imports (by combining it with Components).
+
+```js
+let assets:any = {};
+assets.testMesh = './src/bjs/testMesh.obj';
+
+assetLibrary.load(assets)
+    .then(function() {
+      assetLibrary.meshes['testMesh'] // Mesh
+    })
+``` 
+
+Future upgrade might include importing Textures.
+
+### Different Possible Buildings
+
+This isn't an exhaustive set, due to the randomness of my LSystem & Building construction. But some the images generated by the default noise & seed.
+
+
+![](images/screen_1.png)
+![](images/screen_2.png)
+![](images/screen_3.png)
+![](images/screen_4.png)
+![](images/screen_5.png)
+![](images/screen_6.png)
+![](images/screen_7.png)
+![](images/screen_8.png)
+![](images/screen_9.png)
+![](images/screen_10.png)
+![](images/screen_11.png)
+![](images/screen_12.png)
+![](images/screen_13.png)
+![](images/screen_14.png)
+![](images/screen_15.png)
+![](images/screen_16.png)
+![](images/screen_17.png)
